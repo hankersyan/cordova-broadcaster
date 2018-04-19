@@ -1,11 +1,10 @@
-package org.bsc.cordova;
+package io.hankersyan.cordova.plugin;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import org.apache.cordova.CallbackContext;
@@ -19,35 +18,32 @@ import org.json.JSONObject;
  */
 public class CDVBroadcaster extends CordovaPlugin {
 
-    private static String TAG =  CDVBroadcaster.class.getSimpleName();
+    private static String TAG = CDVBroadcaster.class.getSimpleName();
 
     public static final String EVENTNAME_ERROR = "event name null or empty.";
 
-    final java.util.Map<String,BroadcastReceiver> receiverMap =
-                    new java.util.HashMap<String,BroadcastReceiver>(10);
+    final java.util.Map<String, BroadcastReceiver> receiverMap =
+            new java.util.HashMap<String, BroadcastReceiver>(10);
 
     /**
-     *
      * @param eventName
      * @param data
      * @param <T>
      */
-    protected <T> void fireEvent( final String eventName, final Object data) {
+    protected <T> void fireEvent(final String eventName, final Object data) {
 
-        cordova.getActivity().runOnUiThread( new Runnable() {
+        cordova.getActivity().runOnUiThread(new Runnable() {
 
             @Override
             public void run() {
                 String method = null;
 
-                if( data == null ) {
-                    method = String.format("javascript:window.broadcaster.fireEvent( '%s', null );", eventName );
-                }
-                else if( data instanceof JSONObject ) {
-                    method = String.format("javascript:window.broadcaster.fireEvent( '%s', %s );", eventName, data.toString() );
-                }
-                else  {
-                    method = String.format("javascript:window.broadcaster.fireEvent( '%s', '%s' );", eventName, data.toString() );
+                if (data == null) {
+                    method = String.format("javascript:window.broadcaster.fireEvent( '%s', null );", eventName);
+                } else if (data instanceof JSONObject) {
+                    method = String.format("javascript:window.broadcaster.fireEvent( '%s', %s );", eventName, data.toString());
+                } else {
+                    method = String.format("javascript:window.broadcaster.fireEvent( '%s', '%s' );", eventName, data.toString());
                 }
                 CDVBroadcaster.this.webView.loadUrl(method);
             }
@@ -55,60 +51,71 @@ public class CDVBroadcaster extends CordovaPlugin {
     }
 
     /**
-     *
      * @param receiver
      * @param filter
      */
     protected void registerReceiver(android.content.BroadcastReceiver receiver, android.content.IntentFilter filter) {
-        LocalBroadcastManager.getInstance(super.webView.getContext()).registerReceiver(receiver,filter);
+        cordova.getThreadPool().execute(new Runnable() {
+            @Override
+            public void run() {
+                CDVBroadcaster.this.cordova.getActivity().registerReceiver(receiver, filter);
+            }
+        });
     }
 
     /**
-     *
      * @param receiver
      */
     protected void unregisterReceiver(android.content.BroadcastReceiver receiver) {
-        LocalBroadcastManager.getInstance(super.webView.getContext()).unregisterReceiver(receiver);
+        cordova.getThreadPool().execute(new Runnable() {
+            @Override
+            public void run() {
+                CDVBroadcaster.this.cordova.getActivity().unregisterReceiver(receiver);
+            }
+        });
     }
 
     /**
-     *
      * @param intent
      * @return
      */
     protected boolean sendBroadcast(android.content.Intent intent) {
-        return LocalBroadcastManager.getInstance(super.webView.getContext()).sendBroadcast(intent);
+        cordova.getThreadPool().execute(new Runnable() {
+            @Override
+            public void run() {
+                CDVBroadcaster.this.cordova.getActivity().sendBroadcast(intent);
+            }
+        });
+        return true;
     }
 
     /**
-     *
-     * @param id            The message id
-     * @param data          The message data
+     * @param id   The message id
+     * @param data The message data
      * @return
      */
     @Override
     public Object onMessage(String id, Object data) {
 
-        if( receiverMap.containsKey(id) ) {
-            fireEvent( id, data );
+        if (receiverMap.containsKey(id)) {
+            fireEvent(id, data);
         }
-        return super.onMessage( id, data );
+        return super.onMessage(id, data);
     }
 
-    private void fireNativeEvent( final String eventName, JSONObject userData ) {
-        if( eventName == null ) {
+    private void fireNativeEvent(final String eventName, JSONObject userData) {
+        if (eventName == null) {
             throw new IllegalArgumentException("eventName parameter is null!");
         }
 
         final Intent intent = new Intent(eventName);
 
-        intent.putExtras(toBundle( new Bundle(), userData ));
+        intent.putExtras(toBundle(new Bundle(), userData));
 
-        sendBroadcast( intent );
+        sendBroadcast(intent);
     }
 
     /**
-     *
      * @param action          The action to execute.
      * @param args            The exec() arguments.
      * @param callbackContext The callback context used when calling back into JavaScript.
@@ -117,10 +124,10 @@ public class CDVBroadcaster extends CordovaPlugin {
      */
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-        if( action.equals("fireNativeEvent")) {
+        if (action.equals("fireNativeEvent")) {
 
             final String eventName = args.getString(0);
-            if( eventName==null || eventName.isEmpty() ) {
+            if (eventName == null || eventName.isEmpty()) {
                 callbackContext.error(EVENTNAME_ERROR);
 
             }
@@ -136,8 +143,7 @@ public class CDVBroadcaster extends CordovaPlugin {
 
             callbackContext.success();
             return true;
-        }
-        else if (action.equals("addEventListener")) {
+        } else if (action.equals("addEventListener")) {
 
             final String eventName = args.getString(0);
             if (eventName == null || eventName.isEmpty()) {
@@ -153,7 +159,7 @@ public class CDVBroadcaster extends CordovaPlugin {
 
                         final Bundle b = intent.getExtras();
 
-                        fireEvent(eventName, toJsonObject(b) );
+                        fireEvent(eventName, toJsonObject(b));
 
                     }
                 };
@@ -190,8 +196,8 @@ public class CDVBroadcaster extends CordovaPlugin {
     @Override
     public void onDestroy() {
         // deregister receiver
-        for( BroadcastReceiver r : receiverMap.values() ) {
-                    unregisterReceiver(r);
+        for (BroadcastReceiver r : receiverMap.values()) {
+            unregisterReceiver(r);
         }
 
         receiverMap.clear();
@@ -208,11 +214,11 @@ public class CDVBroadcaster extends CordovaPlugin {
      * @return
      */
     private static Bundle toBundle(final Bundle bundle, JSONObject object) {
-        if( bundle == null || object == null ) return bundle;
+        if (bundle == null || object == null) return bundle;
 
         final java.util.Iterator<String> keys = object.keys();
 
-        while( keys.hasNext() ) {
+        while (keys.hasNext()) {
             final String key = keys.next();
 
             if (object.isNull(key)) {
@@ -262,13 +268,13 @@ public class CDVBroadcaster extends CordovaPlugin {
     private static JSONObject toJsonObject(final Bundle bundle) {
         final JSONObject result = new JSONObject();
 
-        if( bundle != null ) {
+        if (bundle != null) {
 
             for (final String key : bundle.keySet()) {
                 try {
                     result.putOpt(key, toJsonValue(bundle.get(key)));
                 } catch (JSONException e) {
-                    Log.w( TAG, String.format("error parsing Bundle key %s", key), e);
+                    Log.w(TAG, String.format("error parsing Bundle key %s", key), e);
                 }
             }
 
@@ -278,7 +284,6 @@ public class CDVBroadcaster extends CordovaPlugin {
     }
 
     /**
-     *
      * Credit: https://github.com/darryncampbell/darryncampbell-cordova-plugin-intent
      *
      * @param value
@@ -297,15 +302,15 @@ public class CDVBroadcaster extends CordovaPlugin {
                 try {
                     result.put(i, toJsonValue(v));
                 } catch (JSONException e) {
-                    Log.w( TAG, String.format("error parsing array element %d vaule %s", i,v), e);
+                    Log.w(TAG, String.format("error parsing array element %d vaule %s", i, v), e);
                 }
             }
             return result;
-        } else if ( value instanceof String
-                        || value instanceof Boolean
-                        || value instanceof Integer
-                        || value instanceof Long
-                        || value instanceof Double) {
+        } else if (value instanceof String
+                || value instanceof Boolean
+                || value instanceof Integer
+                || value instanceof Long
+                || value instanceof Double) {
             return value;
         } else {
             return String.valueOf(value);
