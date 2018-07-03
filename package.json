@@ -1,5 +1,5 @@
 {
-  "name": "hankersyan-cordova-plugin-broadcaster",
+  "name": "io.hankersyan.cordova.plugin.broadcaster",
   "version": "3.2.0",
   "description": "Allow send message from Javascript to Native",
   "cordova": {
